@@ -18,8 +18,10 @@ def load_config() -> dict:
     CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
     return cfg
 
+def save_config(cfg: dict):
+    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
 headers = {
-    # 基本常用头
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
@@ -59,8 +61,13 @@ def analyze(data):
                 "due": a.get("DateDue"),
                 "assigned": a.get("DateAssigned"),
         })
-    for it in items:
-        print(it["course"], "|", it["title"], "|", it["due"], "|", it["assigned"])
+    if not items:
+        print("please check the login status and relogin")
+        cfg = {"first_run" : False} 
+        save_config(cfg)
+    else:
+        for it in items:
+            print(it["course"], "|", it["title"], "|", it["due"], "|", it["assigned"])
 
 
 def main():
@@ -83,8 +90,8 @@ def main():
                 continue
         except Exception:
             pass    
-        analyze(res)
         break
+    analyze(res)
 
 if __name__ == "__main__":
     main()

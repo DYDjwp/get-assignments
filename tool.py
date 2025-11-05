@@ -90,10 +90,9 @@ def create_driver(headless: bool = False) -> webdriver.Chrome:
     return webdriver.Chrome(service=service, options=build_chrome_options(headless=headless))
 
 def wait_until_all_windows_closed(driver: webdriver.Chrome, poll_sec: float = 0.5):
-    """阻塞直到用户关闭浏览器窗口（或进程退出）"""
     while True:
         try:
-            _ = driver.window_handles  # 如果窗口都关了会抛 WebDriverException
+            _ = driver.window_handles  # WebDriverException
             time.sleep(poll_sec)
         except WebDriverException:
             break
