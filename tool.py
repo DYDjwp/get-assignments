@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-import sys, itertools, time, json, threading, getpass
+import sys, itertools, time, threading, getpass
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service

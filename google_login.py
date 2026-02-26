@@ -1,7 +1,5 @@
 from pathlib import Path
-import sys
 import time
-import getpass
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -141,5 +139,5 @@ def google_login(cfg):
     finally:
         try:
             driver.quit()
-        except Exception:
+        except Exception as e:
             raise RuntimeError(f"An unknown error occurred: {e}")

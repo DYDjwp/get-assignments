@@ -35,23 +35,26 @@ def analyze(data, cfg):
 
 
 def main():
-    time = 3
+    times = 3
     cfg = load_config()
     if not cfg.get("t"):
         print("can not find apikey in config")
         t = request_apikey()
     else:
         t = cfg.get("t")
-    while time > 0:
+    while times > 0:
         url = f"https://hillbrook.myschoolapp.com/api/assignment2/StudentAssignmentCenterGet?displayByDueDate=true&t={t}"
-        response = requests.get(url, headers=headers)
+        try:
+            response = requests.get(url, headers=headers, timeout=20)
+        except:
+            raise TimeoutError("Request timed out")
         res = response.json()
         try:
             if res['Error']:
                 print("apikey has expired or is incorrect.")
-                t = request_apikey()
-                time -= 1
-                continue
+            t = request_apikey()
+            times -= 1
+            continue
         except Exception:
             pass    
         break
