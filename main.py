@@ -1,25 +1,6 @@
-import subprocess, sys
 import requests
-from pathlib import Path
-import json
-import re
-
-HERE = Path(__file__).resolve().parent
-CONFIG_PATH = HERE / "config.json"
-DATA_PATH = HERE / "data.json"
-
-def load_config() -> dict:
-    if CONFIG_PATH.exists():
-        try:
-            return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    cfg = {"first_run": False}
-    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-    return cfg
-
-def save_config(cfg: dict):
-    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+from config_tool import load_config, save_config, save_data
+from tool import get_token
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -30,28 +11,10 @@ headers = {
     "X-Requested-With": "XMLHttpRequest",
 }
 
-cmd = [sys.executable, "tool.py", "arg1", "arg2"]
-
 def request_apikey():
-    res = subprocess.run(
-        cmd, 
-        text=True,             
-        encoding="utf-8",      
-        check=False, 
-        stdout=subprocess.PIPE,
-        stderr=None,          
-        timeout=3000            
-    )
-    print()
-    print("Exit code:", res.returncode)
-    m = re.search(r't=\s*([0-9a-fA-F-]+)', res.stdout)
-    if m:
-        t = m.group(1)
-        return t or None
-    else:
-        return None
+    return get_token()
     
-def analyze(data):
+def analyze(data, cfg):
     items = []
     for section in ("DueToday", "DueTomorrow", "DueThisWeek", "DueNextWeek", "DueAfterNextWeek"):
         for a in data.get(section, []):
@@ -63,7 +26,8 @@ def analyze(data):
         })
     if not items:
         print("please check the login status and relogin")
-        cfg = {"first_run" : False} 
+        cfg["login_status"] = False 
+        cfg["check"] = False
         save_config(cfg)
     else:
         for it in items:
@@ -91,7 +55,8 @@ def main():
         except Exception:
             pass    
         break
-    analyze(res)
+    analyze(res, cfg)
+    save_data(res)
 
 if __name__ == "__main__":
     main()

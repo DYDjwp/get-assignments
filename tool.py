@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-import sys, itertools, time, json, threading
+import sys, itertools, time, json, threading, getpass
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -10,11 +10,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
-HERE = Path(__file__).resolve().parent
-PORTABLE_BASE = (HERE / "profile1" / "User Data").resolve()
-PORTABLE_BASE.mkdir(parents=True, exist_ok=True)
+from google_login import google_login
+from config_tool import load_config, save_config
 
-CONFIG_PATH = HERE / "config.json"
+HERE = Path(__file__).resolve().parent
+PORTABLE_BASE = (HERE / "profile" / "User Data").resolve()
+PORTABLE_BASE.mkdir(parents=True, exist_ok=True)
 
 class LiveProgress:
     def __init__(self, width=20, text="loading get apikey", stream=sys.stderr):
@@ -48,19 +49,6 @@ class LiveProgress:
         mark = "✓" if ok else "✗"
         self.stream.write(f"\r[{bar}] 100% {self.text} {mark}\n")
         self.stream.flush()
-
-def load_config() -> dict:
-    if CONFIG_PATH.exists():
-        try:
-            return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    cfg = {"first_run": False}
-    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-    return cfg
-
-def save_config(cfg: dict):
-    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
 
 MYSCHOOLAPP_LOGIN_URL = (
     "https://app.blackbaud.com/signin/?svcid=edu&envid=p-d7NVWib9D0e6P7mLFSA-kw"
@@ -97,15 +85,19 @@ def wait_until_all_windows_closed(driver: webdriver.Chrome, poll_sec: float = 0.
         except WebDriverException:
             break
 
-def init_profile_interactive():
-    driver = create_driver(headless=False)
+def google(cfg):
     try:
-        wait_until_all_windows_closed(driver)
-    finally:
-        try:
-            driver.quit()
-        except Exception:
-            pass
+        google_login(cfg)
+        cfg["login_status"] = True
+        cfg["check"] = True
+        save_config(cfg)
+        return True
+    except Exception as e:
+        print(e)
+        cfg["login_status"] = False
+        cfg["check"] = False
+        save_config(cfg)
+        return False
 
 def do_myschoolapp_google_continue(headless: bool = False):
     lp = LiveProgress(text="loading...")
@@ -198,9 +190,8 @@ def do_myschoolapp_google_continue(headless: bool = False):
                         driver.switch_to.default_content()
                 else:
                     driver.quit()
-                    raise TimeoutException("未找到或无法点击“Continue with Google”按钮：可能页面结构/iframe 变化。")
+                    raise TimeoutException("The Continue with Google button could not be found or clicked: This may be due to changes in the page structure/iframe.")
     lp.update(30)
-    # 等 8 秒加载并读取 cookie 't' 
     for i in range(8):
         time.sleep(1)
         lp.update(35 + i * 5)
@@ -226,17 +217,22 @@ def do_myschoolapp_google_continue(headless: bool = False):
     driver.quit()
     return t_val
 
-def main():
+def get_token():
+    t = None
     cfg = load_config()
-    if not cfg.get("first_run"):
-        init_profile_interactive()
-        cfg["first_run"] = True
-        save_config(cfg)
-        print(">>> Initialization completed")
+    if not cfg.get("check"):
+        cfg["email"] = input("please input your email address:")
+        cfg["password"] = getpass.getpass("please input your password:")
+    if not cfg.get("login_status"):
+        if google(cfg):
+            print("login completed")
+            t = do_myschoolapp_google_continue(headless=True)
+            cfg["t"] = t
+            save_config(cfg)
+        else:
+            print("login error")
     else:
         t = do_myschoolapp_google_continue(headless=True)
         cfg["t"] = t
         save_config(cfg)
-
-if __name__ == "__main__":
-    main()
+    return t 
