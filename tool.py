@@ -201,7 +201,7 @@ def do_myschoolapp_google_continue(headless, cfg):
         if c and "value" in c:
             t_val = c["value"]
         else:
-            if driver.find_elements(By.TAG_NAME, 'input'):
+            if driver.find_elements(By.TAG_NAME, 'input') or "accounts.google.com/" in driver.current_url:
                 cfg["login_status"] = False
                 save_config(cfg)
     except Exception:
