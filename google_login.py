@@ -13,6 +13,7 @@ from selenium.common.exceptions import (
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from config_tool import save_config
 
 
 HERE = Path(__file__).resolve().parent
@@ -127,6 +128,13 @@ def google_login(cfg):
 
             safe_type(driver, (By.XPATH, "//input[@type='password']"), password, timeout=TIMEOUT_LONG, clear_first=False)
             safe_click(driver, (By.ID, "passwordNext"), timeout=TIMEOUT_SHORT)
+            time.sleep(1)
+            if driver.find_elements(By.XPATH, "//span[contains(text(), 'Wrong password')]"):
+                cfg["login_status"] = False
+                cfg["check"] = False
+                save_config(cfg)
+                driver.quit()
+                raise RuntimeError("Wrong password entered")
             print("Email/password submitted")
         except Exception:
             driver.quit()
