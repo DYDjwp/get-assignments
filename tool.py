@@ -99,7 +99,7 @@ def google(cfg):
         save_config(cfg)
         return False
 
-def do_myschoolapp_google_continue(headless: bool = False):
+def do_myschoolapp_google_continue(headless, cfg):
     lp = LiveProgress(text="loading...")
     lp.start()
     lp.update(0)
@@ -200,6 +200,10 @@ def do_myschoolapp_google_continue(headless: bool = False):
         c = driver.get_cookie("t")
         if c and "value" in c:
             t_val = c["value"]
+        else:
+            if driver.find_elements(By.TAG_NAME, 'input'):
+                cfg["login_status"] = False
+                save_config(cfg)
     except Exception:
         pass
 
@@ -226,13 +230,13 @@ def get_token():
     if not cfg.get("login_status"):
         if google(cfg):
             print("login completed")
-            t = do_myschoolapp_google_continue(headless=True)
+            t = do_myschoolapp_google_continue(headless=True, cfg=cfg)
             cfg["t"] = t
             save_config(cfg)
         else:
             print("login error")
     else:
-        t = do_myschoolapp_google_continue(headless=True)
+        t = do_myschoolapp_google_continue(headless=True, cfg=cfg)
         cfg["t"] = t
         save_config(cfg)
     return t 
