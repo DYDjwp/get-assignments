@@ -2,43 +2,23 @@ from pathlib import Path
 import time
 
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import (
     TimeoutException,
     WebDriverException,
     StaleElementReferenceException,
     ElementClickInterceptedException,
+    NoSuchElementException
 )
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-from config_tool import save_config
+from config_tool import save_config, build_driver
 
 
 HERE = Path(__file__).resolve().parent
-PORTABLE_BASE = (HERE / "profile" / "User Data").resolve()
-PORTABLE_BASE.mkdir(parents=True, exist_ok=True)
 
 TIMEOUT_SHORT = 10
 TIMEOUT_LONG = 60
-
-
-def build_driver() -> webdriver.Chrome:
-    options = webdriver.ChromeOptions()
-    options.add_argument(f"--user-data-dir={PORTABLE_BASE}")
-    options.add_argument("--profile-directory=Default")
-    options.add_argument("--start-maximized")
-    options.add_argument("--headless=new")
-
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option("useAutomationExtension", False)
-
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
-    driver.set_page_load_timeout(30)
-    return driver
 
 
 def wait_any(wait: WebDriverWait, *conditions):
@@ -109,13 +89,20 @@ def google_login(cfg):
 
         safe_type(driver, (By.ID, "identifierId"), email, timeout=TIMEOUT_SHORT)
         safe_click(driver, (By.ID, "identifierNext"), timeout=TIMEOUT_SHORT)
+        time.sleep(1)
+
+        if driver.find_elements(By.XPATH, "//*[contains(., 'Couldn’t find')]"):
+            cfg["login_status"] = False
+            cfg["check"] = False
+            save_config(cfg)
+            raise RuntimeError("Wrong email entered")
 
         wait2 = WebDriverWait(driver, TIMEOUT_LONG)
         result = wait_any(
             wait2,
             EC.visibility_of_element_located((By.XPATH, "//input[@type='password']")),
             EC.presence_of_element_located((By.XPATH, "//*[contains(@data-challengetype,'')]")),  
-            EC.presence_of_element_located((By.XPATH, "//*[contains(., 'Try another way') or contains(., '验证') or contains(., 'Verify')]")),
+            EC.presence_of_element_located((By.XPATH, "//*[contains(., 'Try another way') or contains(., 'Verify')]")),
         )
 
         try:
@@ -123,29 +110,30 @@ def google_login(cfg):
             try:
                 password = cfg["password"]
             except:
-                driver.quit()
                 raise KeyError("can't find password on config")
 
             safe_type(driver, (By.XPATH, "//input[@type='password']"), password, timeout=TIMEOUT_LONG, clear_first=False)
             safe_click(driver, (By.ID, "passwordNext"), timeout=TIMEOUT_SHORT)
             time.sleep(1)
-            if driver.find_elements(By.XPATH, "//span[contains(text(), 'Wrong password')]"):
+            if driver.find_elements(By.XPATH, "//*[contains(., 'Wrong password')]"):
                 cfg["login_status"] = False
                 cfg["check"] = False
                 save_config(cfg)
-                driver.quit()
                 raise RuntimeError("Wrong password entered")
             print("Email/password submitted")
-        except Exception:
-            driver.quit()
+        except (TimeoutException, NoSuchElementException) as e:
             raise RuntimeError("It appears that the password input page was not accessed, which may have triggered a two-factor authentication/abnormal process.")
-
+    except RuntimeError:
+        raise
+    except KeyError:
+        raise
     except WebDriverException as e:
         raise RuntimeError(f"Browser driver error: {e}")
     except Exception as e:
-        raise RuntimeError(f"An unknown error occurred: {e}")
+        raise RuntimeError("An error occurred") from e
     finally:
         try:
             driver.quit()
         except Exception as e:
             raise RuntimeError(f"An unknown error occurred: {e}")
+

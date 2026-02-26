@@ -3,19 +3,13 @@ from pathlib import Path
 import sys, itertools, time, threading, getpass
 
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 from google_login import google_login
-from config_tool import load_config, save_config
-
-HERE = Path(__file__).resolve().parent
-PORTABLE_BASE = (HERE / "profile" / "User Data").resolve()
-PORTABLE_BASE.mkdir(parents=True, exist_ok=True)
+from config_tool import load_config, save_config, build_driver
 
 class LiveProgress:
     def __init__(self, width=20, text="loading get apikey", stream=sys.stderr):
@@ -62,29 +56,6 @@ LOCATORS = [
     (By.XPATH, "//button[contains(@class,'sky-btn') and contains(normalize-space(.), 'Continue with Google')]"),
 ]
 
-def build_chrome_options(headless: bool = False) -> webdriver.ChromeOptions:
-    opts = webdriver.ChromeOptions()
-    opts.add_argument(f"--user-data-dir={PORTABLE_BASE}")
-    if headless:
-        opts.add_argument("--headless=new")
-        opts.add_argument("--disable-gpu")
-        opts.add_argument("--window-size=1400,900")
-    else:
-        opts.add_argument("--start-maximized")
-    return opts
-
-def create_driver(headless: bool = False) -> webdriver.Chrome:
-    service = Service(ChromeDriverManager().install())
-    return webdriver.Chrome(service=service, options=build_chrome_options(headless=headless))
-
-def wait_until_all_windows_closed(driver: webdriver.Chrome, poll_sec: float = 0.5):
-    while True:
-        try:
-            _ = driver.window_handles  # WebDriverException
-            time.sleep(poll_sec)
-        except WebDriverException:
-            break
-
 def google(cfg):
     try:
         google_login(cfg)
@@ -99,11 +70,11 @@ def google(cfg):
         save_config(cfg)
         return False
 
-def do_myschoolapp_google_continue(headless, cfg):
+def do_myschoolapp_google_continue(cfg):
     lp = LiveProgress(text="loading...")
     lp.start()
     lp.update(0)
-    driver = create_driver(headless=headless)
+    driver = build_driver()
     driver.get(MYSCHOOLAPP_LOGIN_URL)
     wait = WebDriverWait(driver, 30)
 
@@ -230,13 +201,13 @@ def get_token():
     if not cfg.get("login_status"):
         if google(cfg):
             print("login completed")
-            t = do_myschoolapp_google_continue(headless=True, cfg=cfg)
+            t = do_myschoolapp_google_continue(cfg)
             cfg["t"] = t
             save_config(cfg)
         else:
             print("login error")
     else:
-        t = do_myschoolapp_google_continue(headless=True, cfg=cfg)
+        t = do_myschoolapp_google_continue(cfg)
         cfg["t"] = t
         save_config(cfg)
     return t 
